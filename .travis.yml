@@ -10,6 +10,6 @@ install:
 - go get github.com/mattn/goveralls
 - go get github.com/TylerBrock/colorjson
 - go get github.com/fatih/color
-- go get github.com/varlink/go
+- go get github.com/varlink/go/varlink
 script:
 - go build ./...
