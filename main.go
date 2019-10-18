@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -42,7 +43,7 @@ func print_usage(set *flag.FlagSet, arg_help string) {
 	os.Exit(1)
 }
 
-func varlink_call(args []string) {
+func varlink_call(ctx context.Context, args []string) {
 	var err error
 	var oneway bool
 
@@ -62,6 +63,9 @@ func varlink_call(args []string) {
 	var con *varlink.Connection
 	var address string
 	var methodName string
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	if len(bridge) != 0 {
 		con, err = varlink.NewBridge(bridge)
@@ -88,7 +92,7 @@ func varlink_call(args []string) {
 		address = uri[:li]
 		methodName = uri[li+1:]
 
-		con, err = varlink.NewConnection(address)
+		con, err = varlink.NewConnection(ctx, address)
 
 		if err != nil {
 			ErrPrintf("Cannot connect to '%s': %v\n", address, err)
@@ -110,12 +114,12 @@ func varlink_call(args []string) {
 	if oneway {
 		flags |= varlink.Oneway
 	}
-	recv, err := con.Send(methodName, params, flags)
+	recv, err := con.Send(ctx, methodName, params, flags)
 
 	var retval map[string]interface{}
 
 	// FIXME: Use cont
-	_, err = recv(&retval)
+	_, err = recv(ctx, &retval)
 
 	f := colorjson.NewFormatter()
 	f.Indent = 2
@@ -144,7 +148,7 @@ func varlink_call(args []string) {
 	fmt.Println(string(c))
 }
 
-func varlink_help(args []string) {
+func varlink_help(ctx context.Context, args []string) {
 	var err error
 
 	helpFlags := flag.NewFlagSet("help", flag.ExitOnError)
@@ -158,6 +162,9 @@ func varlink_help(args []string) {
 	if help {
 		usage()
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var con *varlink.Connection
 	var address string
@@ -188,7 +195,7 @@ func varlink_help(args []string) {
 
 		address = uri[:li]
 
-		con, err = varlink.NewConnection(address)
+		con, err = varlink.NewConnection(ctx, address)
 
 		if err != nil {
 			ErrPrintf("Cannot connect to '%s': %v\n", address, err)
@@ -197,7 +204,7 @@ func varlink_help(args []string) {
 
 		interfaceName = uri[li+1:]
 	}
-	description, err := con.GetInterfaceDescription(interfaceName)
+	description, err := con.GetInterfaceDescription(ctx, interfaceName)
 
 	if err != nil {
 		ErrPrintf("Cannot get interface description for '%s': %v\n", interfaceName, err)
@@ -207,7 +214,7 @@ func varlink_help(args []string) {
 	fmt.Println(description)
 }
 
-func varlink_info(args []string) {
+func varlink_info(ctx context.Context, args []string) {
 	var err error
 	infoFlags := flag.NewFlagSet("info", flag.ExitOnError)
 	var help bool
@@ -221,6 +228,8 @@ func varlink_info(args []string) {
 		usage()
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	var con *varlink.Connection
 	var address string
 
@@ -240,7 +249,7 @@ func varlink_info(args []string) {
 			usage()
 		}
 
-		con, err = varlink.NewConnection(address)
+		con, err = varlink.NewConnection(ctx, address)
 
 		if err != nil {
 			ErrPrintf("Cannot connect to '%s': %v\n", address, err)
@@ -251,7 +260,7 @@ func varlink_info(args []string) {
 	var vendor, product, version, url string
 	var interfaces []string
 
-	err = con.GetInfo(&vendor, &product, &version, &url, &interfaces)
+	err = con.GetInfo(ctx, &vendor, &product, &version, &url, &interfaces)
 
 	if err != nil {
 		ErrPrintf("Cannot get info for '%s': %v\n", address, err)
@@ -268,6 +277,8 @@ func varlink_info(args []string) {
 func main() {
 	var debug bool
 	var colorMode string
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
 
 	flag.CommandLine.Usage = func() { print_usage(nil, "") }
 	flag.BoolVar(&debug, "debug", false, "Enable debug output")
@@ -284,11 +295,11 @@ func main() {
 
 	switch flag.Arg(0) {
 	case "info":
-		varlink_info(flag.Args()[1:])
+		varlink_info(ctx, flag.Args()[1:])
 	case "help":
-		varlink_help(flag.Args()[1:])
+		varlink_help(ctx, flag.Args()[1:])
 	case "call":
-		varlink_call(flag.Args()[1:])
+		varlink_call(ctx, flag.Args()[1:])
 	default:
 		print_usage(nil, "")
 	}
