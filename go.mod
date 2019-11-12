@@ -1,4 +1,4 @@
-module main.go
+module go-varlink-cmd
 
 require (
 	github.com/TylerBrock/colorjson v0.0.0-20180527164720-95ec53f28296
